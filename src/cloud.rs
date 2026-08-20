@@ -65,20 +65,37 @@ fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x).exp())
 }
 
-pub fn load_ply(path: &str) -> Result<SplatCloud> {
-    let file = File::open(path).with_context(|| format!("open {path}"))?;
-    let mut reader = BufReader::new(file);
-    let parser = Parser::<DefaultElement>::new();
-    let ply = parser.read_ply(&mut reader).context("parse PLY")?;
+impl SplatCloud {
+    /// Load a Gaussian splat cloud from a `.ply` file.
+    pub fn from_ply_path(path: impl AsRef<std::path::Path>) -> Result<SplatCloud> {
+        let path = path.as_ref();
+        let file = File::open(path)
+            .with_context(|| format!("open {}", path.display()))?;
+        Self::from_ply_reader(BufReader::new(file))
+    }
+
+    /// Load a Gaussian splat cloud from `.ply` bytes.
+    pub fn from_ply_bytes(bytes: &[u8]) -> Result<SplatCloud> {
+        Self::from_ply_reader(std::io::Cursor::new(bytes))
+    }
+
+    /// Load a Gaussian splat cloud from any reader over `.ply` data.
+    pub fn from_ply_reader<R: std::io::Read>(mut reader: R) -> Result<SplatCloud> {
+        let parser = Parser::<DefaultElement>::new();
+        let ply = parser.read_ply(&mut reader).context("parse PLY")?;
+        Ok(cloud_from_ply(ply))
+    }
+}
+
+fn cloud_from_ply(ply: ply_rs::ply::Ply<DefaultElement>) -> SplatCloud {
 
     // The vertex element holds the splats; pick the largest element as a fallback.
-    let (elem_name, verts) = ply
+    let empty: Vec<DefaultElement> = Vec::new();
+    let verts = ply
         .payload
         .get("vertex")
-        .map(|v| ("vertex".to_string(), v))
-        .or_else(|| ply.payload.iter().max_by_key(|(_, v)| v.len()).map(|(k, v)| (k.clone(), v)))
-        .context("no elements in PLY")?;
-    let _ = elem_name;
+        .or_else(|| ply.payload.values().max_by_key(|v| v.len()))
+        .unwrap_or(&empty);
 
     let degree = detect_sh_degree(verts.first());
     let fps = floats_per_splat(degree);
@@ -153,11 +170,11 @@ pub fn load_ply(path: &str) -> Result<SplatCloud> {
         }
     }
 
-    Ok(SplatCloud {
+    SplatCloud {
         splats,
         sh_degree: degree,
         sh_coefficients: sh,
-    })
+    }
 }
 
 /// Detect SH degree from the highest `f_rest_N` property present.
@@ -185,7 +202,7 @@ mod tests {
 
     #[test]
     fn parses_three_point_sample() {
-        let cloud = load_ply(SAMPLE).expect("load sample");
+        let cloud = SplatCloud::from_ply_path(SAMPLE).expect("load sample");
         assert_eq!(cloud.splats.len(), 3);
         // This file carries full degree-3 SH.
         assert_eq!(cloud.sh_degree, 3);

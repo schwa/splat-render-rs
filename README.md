@@ -36,9 +36,35 @@ Example:
 splat-render-rs scene.ply --camera-position 0,0,4 --camera-lookat 0,0,0 --output scene.png
 ```
 
+## Library
+
+The CLI is a thin front-end over the `splat_render_rs` crate:
+
+```rust
+use glam::Vec3;
+use splat_render_rs::{Camera, Perspective, RenderSettings, Renderer, SplatCloud};
+
+let cloud = SplatCloud::from_ply_path("scene.ply")?;
+let settings = RenderSettings::default();
+let aspect = settings.width as f32 / settings.height as f32;
+let camera = Camera::look_at(
+    Vec3::new(0.0, 0.0, 4.0),
+    Vec3::ZERO,
+    Vec3::Y,
+    Perspective::new(60f32.to_radians(), aspect, 0.1, 100.0),
+);
+let renderer = Renderer::new()?;                 // owns the wgpu device; reuse it
+let image = renderer.render(&cloud, &camera, &settings)?;
+image.save("scene.png")?;
+```
+
+Key types: `SplatCloud` (`from_ply_path` / `from_ply_bytes` / `from_ply_reader`),
+`Camera` (`look_at` / `from_camera_to_world`), `Perspective`, `RenderSettings`,
+`Renderer`, and `SortMethod`.
+
 ## How it works
 
-1. **PLY load** (`src/ply.rs`): reads positions, scales (`exp`), rotations
+1. **PLY load** (`src/cloud.rs`): reads positions, scales (`exp`), rotations
    (normalized quaternions), colors (`f_dc` through `SH_C0`), opacity
    (`sigmoid`), and spherical-harmonics coefficients (degrees 1–3).
 2. **GPU sort** (`src/sort.wgsl`): a bitonic sort orders splats farthest-first

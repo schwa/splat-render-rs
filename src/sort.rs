@@ -1,13 +1,13 @@
-use clap::ValueEnum;
 use glam::{Mat4, Vec3};
 
-use crate::ply::GpuSplat;
+use crate::cloud::GpuSplat;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+/// How to order splats back-to-front before drawing.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SortMethod {
     /// CPU sort (bring-up fallback).
     Cpu,
-    /// GPU radix sort compute passes.
+    /// GPU bitonic sort.
     Gpu,
 }
 
