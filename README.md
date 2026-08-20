@@ -1,4 +1,4 @@
-# splat-rs
+# splat-render-rs
 
 A CLI tool that renders 3D Gaussian Splat files to PNG using `wgpu`. It is a
 Rust + WGSL port of the GPU/Spark renderer from
@@ -8,7 +8,7 @@ Rust + WGSL port of the GPU/Spark renderer from
 ## Usage
 
 ```sh
-splat-rs <file.ply> [options]
+splat-render-rs <file.ply> [options]
 ```
 
 Renders a `.ply` Gaussian splat file to `output.png`.
@@ -33,7 +33,7 @@ Renders a `.ply` Gaussian splat file to `output.png`.
 Example:
 
 ```sh
-splat-rs scene.ply --camera-position 0,0,4 --camera-lookat 0,0,0 --output scene.png
+splat-render-rs scene.ply --camera-position 0,0,4 --camera-lookat 0,0,0 --output scene.png
 ```
 
 ## How it works

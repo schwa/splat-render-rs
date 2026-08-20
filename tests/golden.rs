@@ -47,7 +47,7 @@ fn rmse(a: &image::RgbaImage, b: &image::RgbaImage) -> f64 {
 
 #[test]
 fn goldens_match_reference() {
-    let bin = env!("CARGO_BIN_EXE_splat-rs");
+    let bin = env!("CARGO_BIN_EXE_splat-render-rs");
     let mut ran = 0;
 
     for case in CASES {
@@ -81,7 +81,7 @@ fn goldens_match_reference() {
                     out.to_str().unwrap(),
                 ])
                 .status()
-                .expect("run splat-rs");
+                .expect("run splat-render-rs");
             assert!(status.success(), "render failed for {} ({sort})", case.ply);
 
             let mine = image::open(&out).expect("open render").to_rgba8();

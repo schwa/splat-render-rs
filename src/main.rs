@@ -8,7 +8,7 @@ use clap::Parser;
 
 /// Render a 3D Gaussian Splat file to a PNG.
 #[derive(Parser, Debug)]
-#[command(name = "splat-rs", about = "Render Gaussian splat files to PNG images")]
+#[command(name = "splat-render-rs", about = "Render Gaussian splat files to PNG images")]
 pub struct Args {
     /// Path to the splat file (.ply) to render.
     pub splat: String,

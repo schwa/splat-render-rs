@@ -1190,7 +1190,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "splat-rs"
+name = "splat-render-rs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
