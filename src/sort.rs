@@ -31,3 +31,195 @@ pub fn cpu_sort(splats: &[GpuSplat], model: Mat4, view: Mat4) -> Vec<u32> {
     order.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
     order.into_iter().map(|(_, i)| i).collect()
 }
+
+// MARK: - GPU bitonic sort
+
+use wgpu::util::DeviceExt;
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct BuildParams {
+    model_view: [f32; 16],
+    count: u32,
+    padded: u32,
+    _pad: [u32; 2],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct StepParams {
+    k: u32,
+    j: u32,
+    _pad: [u32; 2],
+}
+
+/// Sort splats back-to-front on the GPU (bitonic) and return an index buffer of
+/// `count` splat indices in draw order.
+pub fn gpu_sort(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    splat_buf: &wgpu::Buffer,
+    count: u32,
+    model_view: Mat4,
+) -> wgpu::Buffer {
+    let padded = count.next_power_of_two().max(2);
+
+    let records = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("sort-records"),
+        size: (padded as u64) * 8,
+        usage: wgpu::BufferUsages::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    let index_buf = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("sorted-indices"),
+        size: (count.max(1) as u64) * 4,
+        usage: wgpu::BufferUsages::STORAGE,
+        mapped_at_creation: false,
+    });
+
+    let build = BuildParams {
+        model_view: model_view.to_cols_array(),
+        count,
+        padded,
+        _pad: [0, 0],
+    };
+    let build_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("sort-build-params"),
+        contents: bytemuck::bytes_of(&build),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
+    // Bitonic passes: (k, j) pairs. Pack each into a dynamic-offset uniform slot.
+    let mut steps: Vec<StepParams> = Vec::new();
+    let mut k = 2u32;
+    while k <= padded {
+        let mut j = k / 2;
+        while j >= 1 {
+            steps.push(StepParams { k, j, _pad: [0, 0] });
+            j /= 2;
+        }
+        k *= 2;
+    }
+
+    let align = device.limits().min_uniform_buffer_offset_alignment.max(256) as u64;
+    let mut step_data = vec![0u8; steps.len() * align as usize];
+    for (i, s) in steps.iter().enumerate() {
+        let off = i * align as usize;
+        step_data[off..off + std::mem::size_of::<StepParams>()]
+            .copy_from_slice(bytemuck::bytes_of(s));
+    }
+    let step_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("sort-step-params"),
+        contents: &step_data,
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
+    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("sort-shader"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("sort.wgsl").into()),
+    });
+
+    let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("sort-bgl"),
+        entries: &[
+            storage_bgl_entry(0, true),
+            storage_bgl_entry(1, false),
+            uniform_bgl_entry(2, false),
+            uniform_bgl_entry(3, true),
+            storage_bgl_entry(4, false),
+        ],
+    });
+
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("sort-bg"),
+        layout: &layout,
+        entries: &[
+            wgpu::BindGroupEntry { binding: 0, resource: splat_buf.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 1, resource: records.as_entire_binding() },
+            wgpu::BindGroupEntry { binding: 2, resource: build_buf.as_entire_binding() },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &step_buf,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(std::mem::size_of::<StepParams>() as u64),
+                }),
+            },
+            wgpu::BindGroupEntry { binding: 4, resource: index_buf.as_entire_binding() },
+        ],
+    });
+
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("sort-pl"),
+        bind_group_layouts: &[&layout],
+        push_constant_ranges: &[],
+    });
+    let make = |entry: &str| {
+        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some(entry),
+            layout: Some(&pipeline_layout),
+            module: &module,
+            entry_point: entry,
+            compilation_options: Default::default(),
+            cache: None,
+        })
+    };
+    let build_pipeline = make("build_records");
+    let step_pipeline = make("bitonic_step");
+    let extract_pipeline = make("extract_indices");
+
+    let groups = |n: u32| (n + 255) / 256;
+
+    let mut encoder =
+        device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("sort-enc") });
+    {
+        let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("sort-pass"),
+            timestamp_writes: None,
+        });
+        pass.set_pipeline(&build_pipeline);
+        pass.set_bind_group(0, &bind_group, &[0]);
+        pass.dispatch_workgroups(groups(padded), 1, 1);
+
+        pass.set_pipeline(&step_pipeline);
+        for i in 0..steps.len() {
+            let offset = (i as u64 * align) as u32;
+            pass.set_bind_group(0, &bind_group, &[offset]);
+            pass.dispatch_workgroups(groups(padded), 1, 1);
+        }
+
+        pass.set_pipeline(&extract_pipeline);
+        pass.set_bind_group(0, &bind_group, &[0]);
+        pass.dispatch_workgroups(groups(count), 1, 1);
+    }
+    queue.submit(Some(encoder.finish()));
+
+    index_buf
+}
+
+fn storage_bgl_entry(binding: u32, read_only: bool) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Storage { read_only },
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
+        count: None,
+    }
+}
+
+fn uniform_bgl_entry(binding: u32, dynamic: bool) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform,
+            has_dynamic_offset: dynamic,
+            min_binding_size: None,
+        },
+        count: None,
+    }
+}

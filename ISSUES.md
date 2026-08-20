@@ -7,14 +7,18 @@ File format: <https://github.com/schwa/issues-format>
 ## 1: GPU radix sort not implemented; renderer falls back to CPU sort
 
 +++
-status: new
+status: closed
 priority: medium
 kind: none
 labels: renderer
 created: 2026-08-20T16:58:49Z
+updated: 2026-08-20T17:04:15Z
+closed: 2026-08-20T17:04:15Z
 +++
 
 The --sort gpu path prints a note and uses the CPU back-to-front sort instead. The reference GPU renderer (SplatGPUSort.metal / GPUSplatSortComputePass) does a cull+key pass, a 4x8-bit radix sort, and an indirect draw entirely on the GPU. Port this so large clouds don't pay the per-frame CPU sort cost.
+
+- `2026-08-20T17:04:15Z`: Implemented as a GPU bitonic sort (src/sort.wgsl + gpu_sort in sort.rs): build_records computes a depth key per splat, log^2(n) bitonic_step passes order them farthest-first, extract_indices fills the draw index buffer. Not the reference's tile radix, but fully on-GPU and no atomics/subgroups. Golden test covers both sort paths (RMSE < 0.006 vs reference). Left a ponytail note to swap in a radix if sort time dominates.
 
 ---
 

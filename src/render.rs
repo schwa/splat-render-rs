@@ -60,12 +60,6 @@ async fn render_async(
         .await
         .context("request device")?;
 
-    // Sort order. GPU sort is not wired yet; fall back to CPU.
-    if args.sort == SortMethod::Gpu {
-        eprintln!("note: GPU sort not yet implemented, using CPU sort");
-    }
-    let indices = sort::cpu_sort(&cloud.splats, cam.model, cam.view);
-
     // Buffers.
     let splat_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("splats"),
@@ -85,11 +79,21 @@ async fn render_async(
         usage: wgpu::BufferUsages::STORAGE,
     });
 
-    let index_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("sorted-indices"),
-        contents: bytemuck::cast_slice(&indices),
-        usage: wgpu::BufferUsages::STORAGE,
-    });
+    // Sorted draw order: farthest-first splat indices.
+    let count = cloud.splats.len() as u32;
+    let index_buf = match args.sort {
+        SortMethod::Cpu => {
+            let indices = sort::cpu_sort(&cloud.splats, cam.model, cam.view);
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("sorted-indices"),
+                contents: bytemuck::cast_slice(&indices),
+                usage: wgpu::BufferUsages::STORAGE,
+            })
+        }
+        SortMethod::Gpu => {
+            sort::gpu_sort(&device, &queue, &splat_buf, count, cam.view * cam.model)
+        }
+    };
 
     let _ = floats_per_splat; // used by ply/tests
 

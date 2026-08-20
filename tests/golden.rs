@@ -59,36 +59,38 @@ fn goldens_match_reference() {
         let golden_path = case.golden;
         assert!(Path::new(golden_path).exists(), "missing golden {golden_path}");
 
-        let out = std::env::temp_dir().join(format!(
-            "splat-rs-test-{}.png",
-            case.ply.replace('/', "_")
-        ));
-        let status = Command::new(bin)
-            .args([
-                &ply,
-                "--camera-position",
-                case.camera_position,
-                "--camera-lookat",
-                case.camera_lookat,
-                "--width",
-                "256",
-                "--height",
-                "192",
-                "--sort",
-                "cpu",
-                "--output",
-                out.to_str().unwrap(),
-            ])
-            .status()
-            .expect("run splat-rs");
-        assert!(status.success(), "render failed for {}", case.ply);
+        for sort in ["cpu", "gpu"] {
+            let out = std::env::temp_dir().join(format!(
+                "splat-rs-test-{}-{sort}.png",
+                case.ply.replace('/', "_")
+            ));
+            let status = Command::new(bin)
+                .args([
+                    &ply,
+                    "--camera-position",
+                    case.camera_position,
+                    "--camera-lookat",
+                    case.camera_lookat,
+                    "--width",
+                    "256",
+                    "--height",
+                    "192",
+                    "--sort",
+                    sort,
+                    "--output",
+                    out.to_str().unwrap(),
+                ])
+                .status()
+                .expect("run splat-rs");
+            assert!(status.success(), "render failed for {} ({sort})", case.ply);
 
-        let mine = image::open(&out).expect("open render").to_rgba8();
-        let golden = image::open(golden_path).expect("open golden").to_rgba8();
-        let err = rmse(&mine, &golden);
-        eprintln!("{}: RMSE {err:.5}", case.ply);
-        assert!(err < 0.02, "{} diverged from golden: RMSE {err}", case.ply);
-        ran += 1;
+            let mine = image::open(&out).expect("open render").to_rgba8();
+            let golden = image::open(golden_path).expect("open golden").to_rgba8();
+            let err = rmse(&mine, &golden);
+            eprintln!("{} ({sort}): RMSE {err:.5}", case.ply);
+            assert!(err < 0.02, "{} ({sort}) diverged from golden: RMSE {err}", case.ply);
+            ran += 1;
+        }
     }
 
     if ran == 0 {
