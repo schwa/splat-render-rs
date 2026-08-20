@@ -109,7 +109,9 @@ async fn render_async(
     });
 
     // Render target.
-    let format = wgpu::TextureFormat::Rgba8Unorm;
+    // sRGB target: the reference renders into a bgra8Unorm_srgb framebuffer, so
+    // blending happens in linear space and values are sRGB-encoded on store.
+    let format = wgpu::TextureFormat::Rgba8UnormSrgb;
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("target"),
         size: wgpu::Extent3d {
