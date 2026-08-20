@@ -21,6 +21,25 @@ pub struct GpuSplat {
     pub rotation: [f32; 4],
 }
 
+impl GpuSplat {
+    /// Build a splat from glam types. Values must already be in GPU form:
+    /// `scale` activated (`exp`), `color` rgb + opacity all in 0..1, and
+    /// `rotation` a normalized quaternion.
+    pub fn new(
+        position: glam::Vec3,
+        scale: glam::Vec3,
+        rotation: glam::Quat,
+        color: glam::Vec4,
+    ) -> Self {
+        GpuSplat {
+            position: [position.x, position.y, position.z, 1.0],
+            scale: [scale.x, scale.y, scale.z, 0.0],
+            color: color.to_array(),
+            rotation: [rotation.x, rotation.y, rotation.z, rotation.w],
+        }
+    }
+}
+
 pub struct SplatCloud {
     pub splats: Vec<GpuSplat>,
     /// SH degree, 0..3. 0 means no view-dependent color.
@@ -66,6 +85,48 @@ fn sigmoid(x: f32) -> f32 {
 }
 
 impl SplatCloud {
+    /// A cloud from GPU-ready splats, with no view-dependent color (SH degree 0).
+    ///
+    /// Each `GpuSplat` must already be in GPU form: scale activated (`exp`),
+    /// opacity in 0..1, color rgb in 0..1, rotation a normalized xyzw quaternion.
+    pub fn from_splats(splats: Vec<GpuSplat>) -> SplatCloud {
+        SplatCloud {
+            splats,
+            sh_degree: 0,
+            sh_coefficients: Vec::new(),
+        }
+    }
+
+    /// A cloud from GPU-ready splats plus spherical-harmonics coefficients.
+    ///
+    /// `sh_degree` must be 1, 2, or 3, and `sh_coefficients` must be interleaved
+    /// `[c0_r, c0_g, c0_b, c1_r, ...]` per splat with exactly
+    /// `splats.len() * floats_per_splat(sh_degree)` entries.
+    pub fn with_sh(
+        splats: Vec<GpuSplat>,
+        sh_degree: u32,
+        sh_coefficients: Vec<f32>,
+    ) -> Result<SplatCloud> {
+        anyhow::ensure!(
+            (1..=3).contains(&sh_degree),
+            "sh_degree must be 1, 2, or 3 (use from_splats for degree 0)"
+        );
+        let expected = splats.len() * floats_per_splat(sh_degree);
+        anyhow::ensure!(
+            sh_coefficients.len() == expected,
+            "sh_coefficients has {} entries, expected {} ({} splats * {} per splat)",
+            sh_coefficients.len(),
+            expected,
+            splats.len(),
+            floats_per_splat(sh_degree),
+        );
+        Ok(SplatCloud {
+            splats,
+            sh_degree,
+            sh_coefficients,
+        })
+    }
+
     /// Load a Gaussian splat cloud from a `.ply` file.
     pub fn from_ply_path(path: impl AsRef<std::path::Path>) -> Result<SplatCloud> {
         let path = path.as_ref();
@@ -220,5 +281,35 @@ mod tests {
             let n = (q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]).sqrt();
             assert!((n - 1.0).abs() < 1e-3, "rotation normalized");
         }
+    }
+
+    #[test]
+    fn constructs_from_splats() {
+        let s = GpuSplat::new(
+            glam::Vec3::ZERO,
+            glam::Vec3::ONE,
+            glam::Quat::IDENTITY,
+            glam::Vec4::new(1.0, 0.0, 0.0, 1.0),
+        );
+        let cloud = SplatCloud::from_splats(vec![s; 4]);
+        assert_eq!(cloud.splats.len(), 4);
+        assert_eq!(cloud.sh_degree, 0);
+        assert!(cloud.sh_coefficients.is_empty());
+        // Padding slot conventions the shader relies on.
+        assert_eq!(cloud.splats[0].position[3], 1.0);
+    }
+
+    #[test]
+    fn with_sh_validates_length() {
+        let splats = vec![GpuSplat::new(
+            glam::Vec3::ZERO,
+            glam::Vec3::ONE,
+            glam::Quat::IDENTITY,
+            glam::Vec4::ONE,
+        ); 2];
+        // degree 1 => 9 floats per splat => 18 total.
+        assert!(SplatCloud::with_sh(splats.clone(), 1, vec![0.0; 18]).is_ok());
+        assert!(SplatCloud::with_sh(splats.clone(), 1, vec![0.0; 17]).is_err());
+        assert!(SplatCloud::with_sh(splats, 0, vec![]).is_err());
     }
 }
