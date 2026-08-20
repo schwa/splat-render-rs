@@ -1,0 +1,3 @@
+/target
+*.png
+!Samples/**/*.png
