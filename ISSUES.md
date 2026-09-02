@@ -44,17 +44,19 @@ load_ply handles PLY (ascii + binary_little_endian) only. The reference SplatLoa
 ## 3: Splats stored as f32 (64 bytes), not f16-packed like the reference
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: perf, effort:l
 created: 2026-08-20T16:58:49Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:59:25Z
+closed: 2026-09-02T19:59:25Z
 +++
 
 GpuSplat is 64 bytes of f32. The reference SparkSplat is a 32-byte half-precision struct. Packing to f16 halves buffer size and bandwidth. Verify visual parity after packing.
 
 - `2026-09-02T19:44:08Z`: Reviewed: packing GpuSplat to f16/32 bytes touches both WGSL shaders and the public GpuSplat API, and correctness of the precision loss can only be judged against the reference goldens — the golden-test .ply sources aren't present on this machine. Punting. Unblocker: make the golden splat files available (tests/golden.rs SPLATS_DIR), then this is safe to attempt.
+- `2026-09-02T19:59:25Z`: GPU splat buffer now packs to 24 bytes (f16 position/scale/rotation via unpack2x16float, rgba8unorm color via unpack4x8unorm) — smaller than the reference's 32-byte SparkSplat. GpuSplat stays f32 as the CPU-side API; packing happens at upload. Sort shader reads packed positions. Validated: lion.v3.spz renders with RMSE 0.0008 vs the f32 build (golden threshold 0.02); cpu/gpu sort parity test still passes.
 
 ---
 

@@ -1233,6 +1233,7 @@ dependencies = [
  "clap",
  "flate2",
  "glam",
+ "half",
  "image",
  "ply-rs",
  "pollster",

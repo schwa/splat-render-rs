@@ -28,7 +28,7 @@ struct StepParams {
     _pad1: u32,
 };
 
-@group(0) @binding(0) var<storage, read> splats_pos: array<vec4<f32>>;
+@group(0) @binding(0) var<storage, read> splats_words: array<u32>;
 @group(0) @binding(1) var<storage, read_write> records: array<Record>;
 @group(0) @binding(2) var<uniform> build: BuildParams;
 @group(0) @binding(3) var<uniform> step: StepParams;
@@ -43,8 +43,8 @@ fn depth_key(vz: f32) -> u32 {
     return b | 0x80000000u;
 }
 
-// splats_pos aliases the Splat storage buffer: each Splat starts with a vec4
-// position, but the struct stride is 64 bytes (4 vec4), so we index with stride 4.
+// splats_words aliases the packed Splat buffer (24-byte stride = 6 u32 words):
+// word 0 holds f16 x|y, word 1's low half holds f16 z.
 @compute @workgroup_size(256)
 fn build_records(@builtin(global_invocation_id) gid: vec3<u32>) {
     let i = gid.x;
@@ -56,8 +56,9 @@ fn build_records(@builtin(global_invocation_id) gid: vec3<u32>) {
         records[i] = Record(0xFFFFFFFFu, 0u);
         return;
     }
-    let pos = splats_pos[i * 4u];
-    let view_pos = build.model_view * vec4<f32>(pos.xyz, 1.0);
+    let xy = unpack2x16float(splats_words[i * 6u]);
+    let z = unpack2x16float(splats_words[i * 6u + 1u]).x;
+    let view_pos = build.model_view * vec4<f32>(xy, z, 1.0);
     records[i] = Record(depth_key(view_pos.z), i);
 }
 

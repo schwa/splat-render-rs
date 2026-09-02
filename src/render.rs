@@ -35,6 +35,43 @@ impl Default for RenderSettings {
     }
 }
 
+/// GPU-side splat: f16 position/scale/rotation plus rgba8 color, 24 bytes
+/// (vs 64 for the f32 `GpuSplat`). Unpacked in WGSL with `unpack2x16float`.
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct PackedSplat {
+    position_xy: u32,
+    position_z_scale_x: u32,
+    scale_yz: u32,
+    rotation_xy: u32,
+    rotation_zw: u32,
+    color: u32,
+}
+
+fn pack_f16_pair(low: f32, high: f32) -> u32 {
+    half::f16::from_f32(low).to_bits() as u32 | (half::f16::from_f32(high).to_bits() as u32) << 16
+}
+
+fn pack_unorm8(value: f32) -> u32 {
+    (value.clamp(0.0, 1.0) * 255.0).round() as u32
+}
+
+impl From<&crate::cloud::GpuSplat> for PackedSplat {
+    fn from(s: &crate::cloud::GpuSplat) -> Self {
+        PackedSplat {
+            position_xy: pack_f16_pair(s.position[0], s.position[1]),
+            position_z_scale_x: pack_f16_pair(s.position[2], s.scale[0]),
+            scale_yz: pack_f16_pair(s.scale[1], s.scale[2]),
+            rotation_xy: pack_f16_pair(s.rotation[0], s.rotation[1]),
+            rotation_zw: pack_f16_pair(s.rotation[2], s.rotation[3]),
+            color: pack_unorm8(s.color[0])
+                | pack_unorm8(s.color[1]) << 8
+                | pack_unorm8(s.color[2]) << 16
+                | pack_unorm8(s.color[3]) << 24,
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
@@ -186,12 +223,14 @@ impl Renderer {
         let width = settings.width;
         let height = settings.height;
 
-        // Buffers.
+        // Buffers. Splats are packed to 24 bytes (f16 + rgba8) for the GPU.
+        let packed: Vec<PackedSplat> = cloud.splats().iter().map(PackedSplat::from).collect();
         let splat_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("splats"),
-            contents: bytemuck::cast_slice(cloud.splats()),
+            contents: bytemuck::cast_slice(&packed),
             usage: wgpu::BufferUsages::STORAGE,
         });
+        drop(packed);
 
         // SH buffer must be non-empty for the binding even at degree 0.
         let sh_data: &[f32] = if cloud.sh_coefficients().is_empty() {

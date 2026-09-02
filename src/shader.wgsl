@@ -11,11 +11,14 @@ struct Uniforms {
     srgb_to_linear: u32,
 };
 
+// 24-byte packed splat: f16 pairs in u32s plus rgba8unorm color.
 struct Splat {
-    position: vec4<f32>,
-    scale: vec4<f32>,
-    color: vec4<f32>,
-    rotation: vec4<f32>,  // (x, y, z, w)
+    position_xy: u32,      // f16 x | f16 y
+    position_z_scale_x: u32,
+    scale_yz: u32,
+    rotation_xy: u32,      // quaternion (x, y, z, w) as f16 pairs
+    rotation_zw: u32,
+    color: u32,            // rgba8unorm
 };
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
@@ -151,10 +154,13 @@ fn vs_main(
     let splat_index = sorted_indices[instance_index];
     let splat = splats[splat_index];
 
-    let center = splat.position.xyz;
-    let scales = splat.scale.xyz;
-    let quat = splat.rotation;
-    var rgba = splat.color;
+    let position_xy = unpack2x16float(splat.position_xy);
+    let position_z_scale_x = unpack2x16float(splat.position_z_scale_x);
+    let scale_yz = unpack2x16float(splat.scale_yz);
+    let center = vec3<f32>(position_xy, position_z_scale_x.x);
+    let scales = vec3<f32>(position_z_scale_x.y, scale_yz);
+    let quat = vec4<f32>(unpack2x16float(splat.rotation_xy), unpack2x16float(splat.rotation_zw));
+    var rgba = unpack4x8unorm(splat.color);
 
     if (rgba.a < MIN_ALPHA) { return out; }
     if (scales.x == 0.0 && scales.y == 0.0 && scales.z == 0.0) { return out; }
