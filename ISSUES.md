@@ -69,6 +69,8 @@ updated: 2026-09-02T19:34:42Z
 
 splat-rs implements core render flags. Reference also has --config, --statistics/--stats, --label, --camera-rotation, --capture, --reveal, --renderer selection, point tuning.
 
+- `2026-09-02T19:48:48Z`: Reviewed while working the backlog: this bundles six flags with different value (config JSON / statistics / label vs. capture / reveal, which are macOS-app oriented and may not fit an offscreen CLI). Punting: needs a scope decision. Unblocker: say which flags you actually want ported and this can be split into per-flag issues.
+
 ---
 
 ## 5: SH_C0 constant has excessive f32 precision (clippy warning)
