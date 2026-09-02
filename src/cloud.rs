@@ -162,6 +162,9 @@ fn cloud_from_ply(ply: ply_rs::ply::Ply<DefaultElement>) -> SplatCloud {
     let fps = floats_per_splat(degree);
     let cpc = coeffs_per_channel(degree);
 
+    // Property names depend only on the degree; build them once, not per vertex.
+    let rest_keys: Vec<String> = (0..3 * cpc).map(|i| format!("f_rest_{i}")).collect();
+
     let mut splats = Vec::with_capacity(verts.len());
     let mut sh = Vec::with_capacity(verts.len() * fps);
 
@@ -222,9 +225,9 @@ fn cloud_from_ply(ply: ply_rs::ply::Ply<DefaultElement>) -> SplatCloud {
         // SH coefficients: PLY stores f_rest planar (all R, then G, then B).
         // Output interleaved [c0_r, c0_g, c0_b, c1_r, ...].
         for c in 0..cpc {
-            let r = prop_f32(v, &format!("f_rest_{}", c)).unwrap_or(0.0);
-            let g = prop_f32(v, &format!("f_rest_{}", cpc + c)).unwrap_or(0.0);
-            let b = prop_f32(v, &format!("f_rest_{}", 2 * cpc + c)).unwrap_or(0.0);
+            let r = prop_f32(v, &rest_keys[c]).unwrap_or(0.0);
+            let g = prop_f32(v, &rest_keys[cpc + c]).unwrap_or(0.0);
+            let b = prop_f32(v, &rest_keys[2 * cpc + c]).unwrap_or(0.0);
             sh.push(r);
             sh.push(g);
             sh.push(b);

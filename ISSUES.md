@@ -136,15 +136,18 @@ render.rs render_async clones cloud.sh_coefficients (up to 45 floats per splat, 
 ## 9: PLY loader allocates format! key strings per coefficient per splat
 
 +++
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: perf, effort:s
 created: 2026-09-02T18:59:04Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:41:14Z
+closed: 2026-09-02T19:41:14Z
 +++
 
 cloud.rs cloud_from_ply builds f_rest_N property names with format! inside the per-vertex loop: 3 string allocations per coefficient, ~135M allocations for a 1M-splat degree-3 cloud. Key names depend only on the degree and could be computed once.
+
+- `2026-09-02T19:41:14Z`: f_rest_* property names now built once per file (depends only on SH degree) instead of 3 format! allocations per coefficient per splat.
 
 ---
 
