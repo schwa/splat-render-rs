@@ -116,6 +116,11 @@ impl SplatCloud {
     /// `sh_degree` must be 1, 2, or 3, and `sh_coefficients` must be interleaved
     /// `[c0_r, c0_g, c0_b, c1_r, ...]` per splat with exactly
     /// `splats.len() * floats_per_splat(sh_degree)` entries.
+    ///
+    /// # Errors
+    ///
+    /// Fails when `sh_degree` is outside 1..=3 or `sh_coefficients` has the
+    /// wrong length for the splat count and degree.
     pub fn with_sh(
         splats: Vec<GpuSplat>,
         sh_degree: u32,
@@ -142,6 +147,10 @@ impl SplatCloud {
     }
 
     /// Load a Gaussian splat cloud from a `.ply` file.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the file cannot be opened or is not parseable PLY.
     pub fn from_ply_path(path: impl AsRef<std::path::Path>) -> Result<SplatCloud> {
         let path = path.as_ref();
         let file = File::open(path)
@@ -150,11 +159,19 @@ impl SplatCloud {
     }
 
     /// Load a Gaussian splat cloud from `.ply` bytes.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the bytes are not parseable PLY.
     pub fn from_ply_bytes(bytes: &[u8]) -> Result<SplatCloud> {
         Self::from_ply_reader(std::io::Cursor::new(bytes))
     }
 
     /// Load a Gaussian splat cloud from any reader over `.ply` data.
+    ///
+    /// # Errors
+    ///
+    /// Fails when reading fails or the data is not parseable PLY.
     pub fn from_ply_reader<R: std::io::Read>(mut reader: R) -> Result<SplatCloud> {
         let parser = Parser::<DefaultElement>::new();
         let ply = parser.read_ply(&mut reader).context("parse PLY")?;

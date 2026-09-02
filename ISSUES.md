@@ -236,15 +236,18 @@ cloud.rs test uses a hardcoded absolute path under /Users/schwa/Projects/Scratch
 ## 14: Public fallible APIs lack # Errors doc sections
 
 +++
-status: open
+status: closed
 priority: low
 kind: documentation
 labels: docs, effort:s
 created: 2026-09-02T18:59:14Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:48:42Z
+closed: 2026-09-02T19:48:42Z
 +++
 
 Renderer::new, Renderer::render, SplatCloud::from_ply_* and with_sh return Result but their doc comments have no # Errors sections describing failure conditions.
+
+- `2026-09-02T19:48:42Z`: Added # Errors sections to Renderer::new, Renderer::render, SplatCloud::with_sh and the three from_ply_* constructors.
 
 ---
 

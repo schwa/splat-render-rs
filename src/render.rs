@@ -59,6 +59,11 @@ pub struct Renderer {
 const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 impl Renderer {
     /// Create a renderer on the default high-performance adapter.
+    ///
+    /// # Errors
+    ///
+    /// Fails when no suitable GPU adapter is found or the device request
+    /// is denied.
     pub fn new() -> Result<Self> {
         pollster::block_on(Self::new_async())
     }
@@ -156,6 +161,11 @@ impl Renderer {
     }
 
     /// Render a splat cloud to an RGBA image.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the splat count exceeds the GPU sort limit (2^31) or the
+    /// readback from the GPU fails.
     pub fn render(
         &self,
         cloud: &SplatCloud,
