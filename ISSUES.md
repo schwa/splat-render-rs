@@ -287,15 +287,18 @@ render.rs converts the mapped readback buffer to an RgbaImage via per-pixel put_
 ## 17: ply-rs dependency pulls future-incompatible block v0.1.6
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: deps, effort:s
 created: 2026-09-02T18:59:14Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:48:10Z
+closed: 2026-09-02T19:48:10Z
 +++
 
 cargo reports 'block v0.1.6 contains code that will be rejected by a future version of Rust', pulled in transitively via ply-rs 0.1.3. Upstream issue; may eventually break builds.
+
+- `2026-09-02T19:48:10Z`: Root cause was wgpu 22's metal backend (block v0.1.6 via metal crate), not ply-rs as the issue said. Upgraded wgpu 22 -> 30 (objc2-based backend); block is gone and the future-incompat warning is cleared. Migration: Option-wrapped entry points/bind group layouts, immediate_size, TexelCopy* renames, PollType, fallible get_mapped_range, plus a WGSL select() parenthesization for newer naga. All tests pass.
 
 ---
 

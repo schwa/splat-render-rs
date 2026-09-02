@@ -73,7 +73,7 @@ fn bitonic_step(@builtin(global_invocation_id) gid: vec3<u32>) {
     let b = records[partner];
     // Ascending block when the k-bit of i is 0, descending otherwise.
     let ascending = (i & step.k) == 0u;
-    let swap = select(a.key < b.key, a.key > b.key, ascending);
+    let swap = select((a.key < b.key), (a.key > b.key), ascending);
     if (swap) {
         records[i] = b;
         records[partner] = a;
