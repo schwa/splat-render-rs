@@ -85,6 +85,5 @@ skips gracefully when the (external) source `.ply` files are absent.
 
 ## Scope
 
-PLY input, the Spark render path, and a GPU bitonic sort. See `ISSUES.md` for
-tracked follow-ups (other input formats, f16 packing, a tile radix sort, and the
-remaining reference CLI flags).
+PLY, `.splat`, `.spz`, and `.sog` input; the Spark render path with f16-packed
+GPU splats; and a GPU bitonic sort. Issues are tracked in `.issues.md`.
