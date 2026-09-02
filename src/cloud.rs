@@ -41,12 +41,12 @@ impl GpuSplat {
 }
 
 pub struct SplatCloud {
-    pub splats: Vec<GpuSplat>,
+    splats: Vec<GpuSplat>,
     /// SH degree, 0..3. 0 means no view-dependent color.
-    pub sh_degree: u32,
+    sh_degree: u32,
     /// Interleaved SH coefficients [c0_r, c0_g, c0_b, c1_r, ...] per splat.
     /// Length = splats.len() * floats_per_splat(sh_degree). Empty if degree 0.
-    pub sh_coefficients: Vec<f32>,
+    sh_coefficients: Vec<f32>,
 }
 
 /// Floats of SH coefficient data per splat, excluding the DC term.
@@ -85,6 +85,20 @@ fn sigmoid(x: f32) -> f32 {
 }
 
 impl SplatCloud {
+    pub fn splats(&self) -> &[GpuSplat] {
+        &self.splats
+    }
+
+    /// SH degree, 0..3. 0 means no view-dependent color.
+    pub fn sh_degree(&self) -> u32 {
+        self.sh_degree
+    }
+
+    /// Interleaved SH coefficients `[c0_r, c0_g, c0_b, c1_r, ...]` per splat.
+    pub fn sh_coefficients(&self) -> &[f32] {
+        &self.sh_coefficients
+    }
+
     /// A cloud from GPU-ready splats, with no view-dependent color (SH degree 0).
     ///
     /// Each `GpuSplat` must already be in GPU form: scale activated (`exp`),

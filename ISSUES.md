@@ -154,15 +154,18 @@ cloud.rs cloud_from_ply builds f_rest_N property names with format! inside the p
 ## 10: SplatCloud public fields allow breaking the SH length invariant
 
 +++
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: api, effort:s
 created: 2026-09-02T18:59:04Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:41:55Z
+closed: 2026-09-02T19:41:55Z
 +++
 
 SplatCloud::with_sh validates sh_coefficients.len() == splats.len() * floats_per_splat(sh_degree), but all fields are pub so callers can mutate them afterwards and violate the invariant the shader relies on.
+
+- `2026-09-02T19:41:55Z`: SplatCloud fields are now private with splats()/sh_degree()/sh_coefficients() accessors; the with_sh invariant can no longer be broken externally.
 
 ---
 

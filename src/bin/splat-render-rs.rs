@@ -138,7 +138,7 @@ fn main() -> Result<()> {
 
     let cloud = SplatCloud::from_ply_path(&args.splat)
         .with_context(|| format!("loading {}", args.splat))?;
-    eprintln!("Loaded {} splats, SH degree {}", cloud.splats.len(), cloud.sh_degree);
+    eprintln!("Loaded {} splats, SH degree {}", cloud.splats().len(), cloud.sh_degree());
 
     let settings = RenderSettings {
         width: args.width,

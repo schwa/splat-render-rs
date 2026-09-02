@@ -182,15 +182,15 @@ impl Renderer {
         // Buffers.
         let splat_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("splats"),
-            contents: bytemuck::cast_slice(&cloud.splats),
+            contents: bytemuck::cast_slice(cloud.splats()),
             usage: wgpu::BufferUsages::STORAGE,
         });
 
         // SH buffer must be non-empty for the binding even at degree 0.
-        let sh_data: &[f32] = if cloud.sh_coefficients.is_empty() {
+        let sh_data: &[f32] = if cloud.sh_coefficients().is_empty() {
             &[0.0]
         } else {
-            &cloud.sh_coefficients
+            cloud.sh_coefficients()
         };
         let sh_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("sh"),
@@ -199,10 +199,10 @@ impl Renderer {
         });
 
         // Sorted draw order: farthest-first splat indices.
-        let count = cloud.splats.len() as u32;
+        let count = cloud.splats().len() as u32;
         let index_buf = match settings.sort {
             SortMethod::Cpu => {
-                let indices = sort::cpu_sort(&cloud.splats, settings.model, camera.view);
+                let indices = sort::cpu_sort(cloud.splats(), settings.model, camera.view);
                 device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("sorted-indices"),
                     contents: bytemuck::cast_slice(&indices),
@@ -220,7 +220,7 @@ impl Renderer {
             model: settings.model.to_cols_array(),
             camera_pos: [camera.position.x, camera.position.y, camera.position.z, 1.0],
             drawable_size: [width as f32, height as f32],
-            sh_degree: cloud.sh_degree,
+            sh_degree: cloud.sh_degree(),
             srgb_to_linear: if settings.srgb_to_linear { 1 } else { 0 },
         };
         let uniform_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
