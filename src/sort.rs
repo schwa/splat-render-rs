@@ -52,12 +52,62 @@ struct StepParams {
     j: u32,
     _pad: [u32; 2],
 }
+/// Cached compute pipelines for the GPU bitonic sort. Create once per device.
+pub(crate) struct SortPipelines {
+    layout: wgpu::BindGroupLayout,
+    build_pipeline: wgpu::ComputePipeline,
+    step_pipeline: wgpu::ComputePipeline,
+    extract_pipeline: wgpu::ComputePipeline,
+}
+
+impl SortPipelines {
+    pub(crate) fn new(device: &wgpu::Device) -> Self {
+        let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("sort-shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("sort.wgsl").into()),
+        });
+
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("sort-bgl"),
+            entries: &[
+                storage_bgl_entry(0, true),
+                storage_bgl_entry(1, false),
+                uniform_bgl_entry(2, false),
+                uniform_bgl_entry(3, true),
+                storage_bgl_entry(4, false),
+            ],
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("sort-pl"),
+            bind_group_layouts: &[&layout],
+            push_constant_ranges: &[],
+        });
+        let make = |entry: &str| {
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some(entry),
+                layout: Some(&pipeline_layout),
+                module: &module,
+                entry_point: entry,
+                compilation_options: Default::default(),
+                cache: None,
+            })
+        };
+        Self {
+            build_pipeline: make("build_records"),
+            step_pipeline: make("bitonic_step"),
+            extract_pipeline: make("extract_indices"),
+            layout,
+        }
+    }
+}
 
 /// Sort splats back-to-front on the GPU (bitonic) and return an index buffer of
 /// `count` splat indices in draw order.
-pub fn gpu_sort(
+pub(crate) fn gpu_sort(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
+    pipelines: &SortPipelines,
     splat_buf: &wgpu::Buffer,
     count: u32,
     model_view: Mat4,
@@ -115,25 +165,9 @@ pub fn gpu_sort(
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
-    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("sort-shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("sort.wgsl").into()),
-    });
-
-    let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("sort-bgl"),
-        entries: &[
-            storage_bgl_entry(0, true),
-            storage_bgl_entry(1, false),
-            uniform_bgl_entry(2, false),
-            uniform_bgl_entry(3, true),
-            storage_bgl_entry(4, false),
-        ],
-    });
-
     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("sort-bg"),
-        layout: &layout,
+        layout: &pipelines.layout,
         entries: &[
             wgpu::BindGroupEntry { binding: 0, resource: splat_buf.as_entire_binding() },
             wgpu::BindGroupEntry { binding: 1, resource: records.as_entire_binding() },
@@ -150,25 +184,6 @@ pub fn gpu_sort(
         ],
     });
 
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("sort-pl"),
-        bind_group_layouts: &[&layout],
-        push_constant_ranges: &[],
-    });
-    let make = |entry: &str| {
-        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some(entry),
-            layout: Some(&pipeline_layout),
-            module: &module,
-            entry_point: entry,
-            compilation_options: Default::default(),
-            cache: None,
-        })
-    };
-    let build_pipeline = make("build_records");
-    let step_pipeline = make("bitonic_step");
-    let extract_pipeline = make("extract_indices");
-
     let groups = |n: u32| (n + 255) / 256;
 
     let mut encoder =
@@ -178,18 +193,18 @@ pub fn gpu_sort(
             label: Some("sort-pass"),
             timestamp_writes: None,
         });
-        pass.set_pipeline(&build_pipeline);
+        pass.set_pipeline(&pipelines.build_pipeline);
         pass.set_bind_group(0, &bind_group, &[0]);
         pass.dispatch_workgroups(groups(padded), 1, 1);
 
-        pass.set_pipeline(&step_pipeline);
+        pass.set_pipeline(&pipelines.step_pipeline);
         for i in 0..steps.len() {
             let offset = (i as u64 * align) as u32;
             pass.set_bind_group(0, &bind_group, &[offset]);
             pass.dispatch_workgroups(groups(padded), 1, 1);
         }
 
-        pass.set_pipeline(&extract_pipeline);
+        pass.set_pipeline(&pipelines.extract_pipeline);
         pass.set_bind_group(0, &bind_group, &[0]);
         pass.dispatch_workgroups(groups(count), 1, 1);
     }

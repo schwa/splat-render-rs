@@ -100,15 +100,18 @@ src/sort.rs:172: clippy::manual_div_ceil on '(n + 255) / 256'. render.rs already
 ## 7: Renderer rebuilds shader modules and pipelines on every render
 
 +++
-status: open
+status: closed
 priority: high
 kind: enhancement
 labels: perf, effort:m
 created: 2026-09-02T18:59:04Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:40:46Z
+closed: 2026-09-02T19:40:46Z
 +++
 
 Renderer is documented as 'create once, render many' but render_async recreates the shader module, bind group layout, pipeline layout, and render pipeline per call. gpu_sort likewise compiles its WGSL and three compute pipelines on every sort. Pipeline compilation dominates per-frame cost for repeated renders.
+
+- `2026-09-02T19:40:46Z`: Render pipeline, bind group layout, and sort compute pipelines now built once in Renderer::new and reused per render. Added tests/render_smoke.rs covering repeated renders and cpu/gpu sort parity.
 
 ---
 

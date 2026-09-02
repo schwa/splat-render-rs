@@ -51,8 +51,12 @@ struct Uniforms {
 pub struct Renderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
+    bind_group_layout: wgpu::BindGroupLayout,
+    pipeline: wgpu::RenderPipeline,
+    sort_pipelines: sort::SortPipelines,
 }
 
+const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 impl Renderer {
     /// Create a renderer on the default high-performance adapter.
     pub fn new() -> Result<Self> {
@@ -81,7 +85,77 @@ impl Renderer {
             )
             .await
             .context("request device")?;
-        Ok(Self { device, queue })
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("splat-shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+        });
+
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("bgl"),
+            entries: &[
+                uniform_entry(0),
+                storage_entry(1),
+                storage_entry(2),
+                storage_entry(3),
+            ],
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("pl"),
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+        // Premultiplied "over" blending.
+        let blend_component = wgpu::BlendComponent {
+            src_factor: wgpu::BlendFactor::One,
+            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+            operation: wgpu::BlendOperation::Add,
+        };
+        let blend = wgpu::BlendState {
+            color: blend_component,
+            alpha: blend_component,
+        };
+
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("splat-pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_main",
+                buffers: &[],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: TARGET_FORMAT,
+                    blend: Some(blend),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleStrip,
+                ..Default::default()
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
+
+        let sort_pipelines = sort::SortPipelines::new(&device);
+
+        Ok(Self {
+            device,
+            queue,
+            bind_group_layout,
+            pipeline,
+            sort_pipelines,
+        })
     }
 
     /// Render a splat cloud to an RGBA image.
@@ -136,7 +210,7 @@ impl Renderer {
                 })
             }
             SortMethod::Gpu => {
-                sort::gpu_sort(device, queue, &splat_buf, count, camera.view * settings.model)
+                sort::gpu_sort(device, queue, &self.sort_pipelines, &splat_buf, count, camera.view * settings.model)
             }
         };
 
@@ -157,7 +231,6 @@ impl Renderer {
 
         // sRGB target: the reference renders into a bgra8Unorm_srgb framebuffer, so
         // blending happens in linear space and values are sRGB-encoded on store.
-        let format = wgpu::TextureFormat::Rgba8UnormSrgb;
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("target"),
             size: wgpu::Extent3d {
@@ -168,31 +241,15 @@ impl Renderer {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format,
+            format: TARGET_FORMAT,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             view_formats: &[],
         });
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        // Pipeline.
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("splat-shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
-        });
-
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("bgl"),
-            entries: &[
-                uniform_entry(0),
-                storage_entry(1),
-                storage_entry(2),
-                storage_entry(3),
-            ],
-        });
-
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("bg"),
-            layout: &bind_group_layout,
+            layout: &self.bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
@@ -213,51 +270,6 @@ impl Renderer {
             ],
         });
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("pl"),
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
-
-        // Premultiplied "over" blending.
-        let blend_component = wgpu::BlendComponent {
-            src_factor: wgpu::BlendFactor::One,
-            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-            operation: wgpu::BlendOperation::Add,
-        };
-        let blend = wgpu::BlendState {
-            color: blend_component,
-            alpha: blend_component,
-        };
-
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("splat-pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format,
-                    blend: Some(blend),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleStrip,
-                ..Default::default()
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview: None,
-            cache: None,
-        });
 
         // Readback buffer with 256-byte row alignment.
         let bytes_per_pixel = 4u32;
@@ -293,7 +305,7 @@ impl Renderer {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            pass.set_pipeline(&pipeline);
+            pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
             pass.draw(0..4, 0..count);
         }
