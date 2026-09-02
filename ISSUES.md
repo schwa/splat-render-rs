@@ -190,15 +190,18 @@ sort.rs gpu_sort calls count.next_power_of_two(), which panics in debug (wraps t
 ## 13: Unit test parses_three_point_sample fails hard when external sample file is missing
 
 +++
-status: open
+status: closed
 priority: low
 kind: bug
 labels: test, effort:xs
 created: 2026-09-02T18:59:14Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:39:02Z
+closed: 2026-09-02T19:39:02Z
 +++
 
 cloud.rs test uses a hardcoded absolute path under /Users/schwa/Projects/Scratch/Splats and expect()s the load, so the test suite fails on any machine without that file. The golden test skips gracefully; this one does not.
+
+- `2026-09-02T19:39:02Z`: Test now builds an in-memory ASCII PLY fixture (degree-3 SH) and parses via from_ply_bytes; no external files needed.
 
 ---
 

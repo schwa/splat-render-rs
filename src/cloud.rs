@@ -258,14 +258,41 @@ fn detect_sh_degree(sample: Option<&DefaultElement>) -> u32 {
 mod tests {
     use super::*;
 
-    const SAMPLE: &str =
-        "/Users/schwa/Projects/Scratch/Splats/inria/test-splat.3-points-from-train.ply";
+    /// ASCII PLY with 3 splats carrying full degree-3 SH (45 f_rest_* props).
+    fn sample_ply() -> Vec<u8> {
+        let mut header = String::from(
+            "ply\nformat ascii 1.0\nelement vertex 3\n\
+             property float x\nproperty float y\nproperty float z\n\
+             property float scale_0\nproperty float scale_1\nproperty float scale_2\n\
+             property float opacity\n\
+             property float rot_0\nproperty float rot_1\nproperty float rot_2\nproperty float rot_3\n\
+             property float f_dc_0\nproperty float f_dc_1\nproperty float f_dc_2\n",
+        );
+        for i in 0..45 {
+            header.push_str(&format!("property float f_rest_{i}\n"));
+        }
+        header.push_str("end_header\n");
+        for i in 0..3 {
+            let mut row = format!(
+                "{i} 0 0 -1 -2 -3 0.5 2 0 0 0 {} {} {}",
+                i as f32 * 0.1,
+                0.2,
+                -0.3,
+            );
+            for c in 0..45 {
+                row.push_str(&format!(" {}", c as f32 * 0.01));
+            }
+            row.push('\n');
+            header.push_str(&row);
+        }
+        header.into_bytes()
+    }
 
     #[test]
     fn parses_three_point_sample() {
-        let cloud = SplatCloud::from_ply_path(SAMPLE).expect("load sample");
+        let cloud = SplatCloud::from_ply_bytes(&sample_ply()).expect("load sample");
         assert_eq!(cloud.splats.len(), 3);
-        // This file carries full degree-3 SH.
+        // The fixture carries full degree-3 SH.
         assert_eq!(cloud.sh_degree, 3);
         assert_eq!(cloud.sh_coefficients.len(), 3 * floats_per_splat(3));
 
@@ -281,6 +308,8 @@ mod tests {
             let n = (q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]).sqrt();
             assert!((n - 1.0).abs() < 1e-3, "rotation normalized");
         }
+        // SH is re-interleaved from planar; splat 0 channel data starts at coefficient 0.
+        assert_eq!(cloud.sh_coefficients[0], 0.0);
     }
 
     #[test]
