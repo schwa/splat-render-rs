@@ -182,15 +182,18 @@ SplatCloud::with_sh validates sh_coefficients.len() == splats.len() * floats_per
 ## 11: cpu_sort uses partial_cmp with NaN fallback instead of total_cmp
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: cleanup, effort:xs
 created: 2026-09-02T18:59:04Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:45:11Z
+closed: 2026-09-02T19:45:11Z
 +++
 
 sort.rs cpu_sort compares depths via partial_cmp(..).unwrap_or(Equal), which silently treats NaN as equal and is more code than f32::total_cmp. Also uses allocating stable sort_by where order of equal keys may not matter.
+
+- `2026-09-02T19:45:11Z`: cpu_sort now uses f32::total_cmp (total order, NaN-safe) instead of partial_cmp with an Equal fallback. Kept the stable sort so equal-depth splats retain file order.
 
 ---
 
