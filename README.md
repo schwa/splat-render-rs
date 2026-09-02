@@ -61,29 +61,3 @@ image.save("scene.png")?;
 Key types: `SplatCloud` (`from_ply_path` / `from_ply_bytes` / `from_ply_reader`),
 `Camera` (`look_at` / `from_camera_to_world`), `Perspective`, `RenderSettings`,
 `Renderer`, and `SortMethod`.
-
-## How it works
-
-1. **PLY load** (`src/cloud.rs`): reads positions, scales (`exp`), rotations
-   (normalized quaternions), colors (`f_dc` through `SH_C0`), opacity
-   (`sigmoid`), and spherical-harmonics coefficients (degrees 1–3).
-2. **GPU sort** (`src/sort.wgsl`): a bitonic sort orders splats farthest-first
-   by view-space depth for correct back-to-front alpha blending.
-3. **Render** (`src/shader.wgsl`): each splat projects its 3D covariance to a 2D
-   ellipse, expands to a quad, applies view-dependent SH color, and blends with
-   premultiplied alpha into an sRGB framebuffer.
-
-## Testing
-
-```sh
-cargo test
-```
-
-`tests/golden.rs` renders known clouds and compares (RMSE) against goldens
-produced by the reference renderer, for both the CPU and GPU sort paths. It
-skips gracefully when the (external) source `.ply` files are absent.
-
-## Scope
-
-PLY, `.splat`, `.spz`, and `.sog` input; the Spark render path with f16-packed
-GPU splats; and a GPU bitonic sort. Issues are tracked in `.issues.md`.
