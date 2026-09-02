@@ -344,18 +344,14 @@ impl Renderer {
         rx.recv().context("map channel")?.context("map readback")?;
 
         let data = slice.get_mapped_range();
-        let mut img = RgbaImage::new(width, height);
-        for y in 0..height {
-            let row = &data[(y * padded) as usize..(y * padded + unpadded) as usize];
-            for x in 0..width {
-                let i = (x * 4) as usize;
-                img.put_pixel(
-                    x,
-                    y,
-                    image::Rgba([row[i], row[i + 1], row[i + 2], row[i + 3]]),
-                );
-            }
+        // Strip per-row alignment padding with row-sized copies.
+        let mut pixels = vec![0u8; (unpadded * height) as usize];
+        for (y, out_row) in pixels.chunks_exact_mut(unpadded as usize).enumerate() {
+            let start = y * padded as usize;
+            out_row.copy_from_slice(&data[start..start + unpadded as usize]);
         }
+        let img = RgbaImage::from_raw(width, height, pixels)
+            .context("readback size mismatch")?;
         drop(data);
         readback.unmap();
 

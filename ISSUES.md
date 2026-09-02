@@ -253,15 +253,18 @@ Cargo.toml release profile only sets opt-level = 3; no lto or codegen-units = 1,
 ## 16: Readback copies pixels one at a time with put_pixel
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: perf, effort:s
 created: 2026-09-02T18:59:14Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:42:46Z
+closed: 2026-09-02T19:42:46Z
 +++
 
 render.rs converts the mapped readback buffer to an RgbaImage via per-pixel put_pixel in a nested loop. Rows could be memcpy'd into the image buffer instead. Minor at small sizes, scales with resolution.
+
+- `2026-09-02T19:42:46Z`: Readback now strips row padding with chunked row copies into a raw buffer and builds the image via RgbaImage::from_raw; per-pixel put_pixel loop removed. Smoke test (which checks pixel content, exercising 64px rows against 256-byte alignment padding) passes.
 
 ---
 
