@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::BufReader;
 
 /// SH DC-term normalization constant (l=0 basis function value).
-const SH_C0: f32 = 0.28209479177387814;
+const SH_C0: f32 = 0.282_094_79;
 
 /// A single Gaussian, laid out for the GPU (64 bytes, all vec4-aligned).
 #[repr(C)]

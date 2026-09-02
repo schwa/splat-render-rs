@@ -35,6 +35,8 @@ updated: 2026-09-02T19:34:42Z
 
 load_ply handles PLY (ascii + binary_little_endian) only. The reference SplatLoader reads .splat, .spz, and .sog (the latter GPU-decoded). Add these formats.
 
+- `2026-09-02T19:44:08Z`: Reviewed: .splat is trivial, but .spz/.sog need format references and there are no sample files of any of the three here to validate a reader against. Punting rather than shipping untested parsers. Unblocker: provide sample .splat/.spz/.sog files (or confirm .splat-only is acceptable as a first step).
+
 ---
 
 ## 3: Splats stored as f32 (64 bytes), not f16-packed like the reference
@@ -49,6 +51,8 @@ updated: 2026-09-02T19:34:42Z
 +++
 
 GpuSplat is 64 bytes of f32. The reference SparkSplat is a 32-byte half-precision struct. Packing to f16 halves buffer size and bandwidth. Verify visual parity after packing.
+
+- `2026-09-02T19:44:08Z`: Reviewed: packing GpuSplat to f16/32 bytes touches both WGSL shaders and the public GpuSplat API, and correctness of the precision loss can only be judged against the reference goldens — the golden-test .ply sources aren't present on this machine. Punting. Unblocker: make the golden splat files available (tests/golden.rs SPLATS_DIR), then this is safe to attempt.
 
 ---
 
@@ -70,15 +74,18 @@ splat-rs implements core render flags. Reference also has --config, --statistics
 ## 5: SH_C0 constant has excessive f32 precision (clippy warning)
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: lint, effort:xs
 created: 2026-09-02T18:59:04Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:44:25Z
+closed: 2026-09-02T19:44:25Z
 +++
 
 src/cloud.rs:8: clippy::excessive_precision fires on SH_C0 = 0.28209479177387814; the extra digits are silently dropped by f32.
+
+- `2026-09-02T19:44:25Z`: Truncated SH_C0 to f32-representable precision; clippy::excessive_precision clear.
 
 ---
 
