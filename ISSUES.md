@@ -118,15 +118,18 @@ Renderer is documented as 'create once, render many' but render_async recreates 
 ## 8: SH coefficient vector is cloned on every render
 
 +++
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: perf, effort:xs
 created: 2026-09-02T18:59:04Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:40:59Z
+closed: 2026-09-02T19:40:59Z
 +++
 
 render.rs render_async clones cloud.sh_coefficients (up to 45 floats per splat, i.e. hundreds of MB for large clouds) just to substitute a 1-element placeholder when empty. The buffer upload could borrow the slice instead.
+
+- `2026-09-02T19:40:59Z`: SH upload now borrows cloud.sh_coefficients (or a static 1-float placeholder) instead of cloning the whole vector each render.
 
 ---
 

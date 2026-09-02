@@ -187,14 +187,14 @@ impl Renderer {
         });
 
         // SH buffer must be non-empty for the binding even at degree 0.
-        let sh_data: Vec<f32> = if cloud.sh_coefficients.is_empty() {
-            vec![0.0]
+        let sh_data: &[f32] = if cloud.sh_coefficients.is_empty() {
+            &[0.0]
         } else {
-            cloud.sh_coefficients.clone()
+            &cloud.sh_coefficients
         };
         let sh_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("sh"),
-            contents: bytemuck::cast_slice(&sh_data),
+            contents: bytemuck::cast_slice(sh_data),
             usage: wgpu::BufferUsages::STORAGE,
         });
 
