@@ -251,15 +251,18 @@ Renderer::new, Renderer::render, SplatCloud::from_ply_* and with_sh return Resul
 ## 15: Release profile missing lto and codegen-units tuning
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: perf, effort:xs
 created: 2026-09-02T18:59:14Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:45:51Z
+closed: 2026-09-02T19:45:51Z
 +++
 
 Cargo.toml release profile only sets opt-level = 3; no lto or codegen-units = 1, leaving performance on the table for a render-heavy binary.
+
+- `2026-09-02T19:45:51Z`: Release profile now sets lto=fat, codegen-units=1, strip=true. Release build verified. Left panic=abort out: anyhow error paths and library consumers benefit from unwinding.
 
 ---
 
