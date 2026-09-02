@@ -210,7 +210,7 @@ impl Renderer {
                 })
             }
             SortMethod::Gpu => {
-                sort::gpu_sort(device, queue, &self.sort_pipelines, &splat_buf, count, camera.view * settings.model)
+                sort::gpu_sort(device, queue, &self.sort_pipelines, &splat_buf, count, camera.view * settings.model)?
             }
         };
 

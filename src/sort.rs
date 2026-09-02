@@ -111,8 +111,9 @@ pub(crate) fn gpu_sort(
     splat_buf: &wgpu::Buffer,
     count: u32,
     model_view: Mat4,
-) -> wgpu::Buffer {
-    let padded = count.next_power_of_two().max(2);
+) -> anyhow::Result<wgpu::Buffer> {
+    let padded = padded_count(count)
+        .ok_or_else(|| anyhow::anyhow!("too many splats to sort on GPU: {count}"))?;
 
     let records = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("sort-records"),
@@ -210,7 +211,29 @@ pub(crate) fn gpu_sort(
     }
     queue.submit(Some(encoder.finish()));
 
-    index_buf
+    Ok(index_buf)
+}
+
+/// Bitonic working size: next power of two above `count`, at least 2.
+/// `None` when the padded size would overflow `u32`.
+fn padded_count(count: u32) -> Option<u32> {
+    count.checked_next_power_of_two().map(|p| p.max(2))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn padded_count_rounds_up_and_rejects_overflow() {
+        assert_eq!(padded_count(0), Some(2));
+        assert_eq!(padded_count(1), Some(2));
+        assert_eq!(padded_count(3), Some(4));
+        assert_eq!(padded_count(1 << 31), Some(1 << 31));
+        // Anything above 2^31 has no u32 power-of-two ceiling.
+        assert_eq!(padded_count((1 << 31) + 1), None);
+        assert_eq!(padded_count(u32::MAX), None);
+    }
 }
 
 fn storage_bgl_entry(binding: u32, read_only: bool) -> wgpu::BindGroupLayoutEntry {

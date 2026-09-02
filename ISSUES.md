@@ -187,15 +187,18 @@ sort.rs cpu_sort compares depths via partial_cmp(..).unwrap_or(Equal), which sil
 ## 12: gpu_sort can overflow next_power_of_two for very large splat counts
 
 +++
-status: open
+status: closed
 priority: low
 kind: bug
 labels: bug, effort:xs
 created: 2026-09-02T18:59:14Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:42:29Z
+closed: 2026-09-02T19:42:29Z
 +++
 
 sort.rs gpu_sort calls count.next_power_of_two(), which panics in debug (wraps to 0 in release) for counts above 2^31. No documented limit or guard on splat count.
+
+- `2026-09-02T19:42:29Z`: gpu_sort now uses checked_next_power_of_two via padded_count() and returns an error for counts above 2^31 instead of debug-panicking/release-wrapping. Unit test covers the helper (full repro needs >2^31 splats, impractical in a test).
 
 ---
 
