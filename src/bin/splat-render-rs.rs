@@ -1,5 +1,7 @@
 //! CLI front-end for the `splat_render_rs` library.
 
+use std::str::FromStr;
+
 use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum};
 use glam::{Mat4, Vec3};
@@ -17,6 +19,54 @@ impl From<SortArg> for SortMethod {
             SortArg::Cpu => SortMethod::Cpu,
             SortArg::Gpu => SortMethod::Gpu,
         }
+    }
+}
+
+fn parse_floats(s: &str, n: usize) -> Result<Vec<f32>, String> {
+    let v: Vec<f32> = s
+        .split(',')
+        .map(|p| p.trim().parse::<f32>())
+        .collect::<Result<_, _>>()
+        .map_err(|_| format!("expected {n} comma-separated numbers"))?;
+    if v.len() != n {
+        return Err(format!("expected {n} values, got {}", v.len()));
+    }
+    Ok(v)
+}
+
+/// `x,y,z` vector CLI argument.
+#[derive(Copy, Clone, Debug)]
+struct Vec3Arg(Vec3);
+
+impl FromStr for Vec3Arg {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, String> {
+        let v = parse_floats(s, 3)?;
+        Ok(Vec3Arg(Vec3::new(v[0], v[1], v[2])))
+    }
+}
+
+/// 16 comma-separated column-major values.
+#[derive(Copy, Clone, Debug)]
+struct Mat4Arg(Mat4);
+
+impl FromStr for Mat4Arg {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, String> {
+        let v = parse_floats(s, 16)?;
+        Ok(Mat4Arg(Mat4::from_cols_slice(&v)))
+    }
+}
+
+/// `r,g,b,a` color in 0..1.
+#[derive(Copy, Clone, Debug)]
+struct RgbaArg([f32; 4]);
+
+impl FromStr for RgbaArg {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, String> {
+        let v = parse_floats(s, 4)?;
+        Ok(RgbaArg([v[0], v[1], v[2], v[3]]))
     }
 }
 
@@ -39,23 +89,23 @@ struct Args {
 
     /// Background color in RGBA (e.g. 0,0,0,1).
     #[arg(long, default_value = "0,0,0,1")]
-    background: String,
+    background: RgbaArg,
 
     /// Camera position in x,y,z.
     #[arg(long)]
-    camera_position: Option<String>,
+    camera_position: Option<Vec3Arg>,
 
     /// Camera look-at target in x,y,z.
     #[arg(long)]
-    camera_lookat: Option<String>,
+    camera_lookat: Option<Vec3Arg>,
 
     /// Camera-to-world matrix, 16 comma-separated column-major values. Overrides other camera flags.
-    #[arg(long)]
-    camera_matrix: Option<String>,
+    #[arg(long, conflicts_with_all = ["camera_position", "camera_lookat"])]
+    camera_matrix: Option<Mat4Arg>,
 
     /// Model position in x,y,z.
     #[arg(long)]
-    model_position: Option<String>,
+    model_position: Option<Vec3Arg>,
 
     /// Vertical field of view in degrees.
     #[arg(long, default_value_t = 60.0)]
@@ -76,63 +126,34 @@ struct Args {
     sort: SortArg,
 }
 
-fn parse_floats(s: &str, n: usize, label: &str) -> Result<Vec<f32>> {
-    let v: Vec<f32> = s
-        .split(',')
-        .map(|p| p.trim().parse::<f32>())
-        .collect::<Result<_, _>>()
-        .with_context(|| format!("{label} must be {n} comma-separated numbers"))?;
-    anyhow::ensure!(v.len() == n, "{label} must have {n} values, got {}", v.len());
-    Ok(v)
-}
-
-fn parse_vec3(s: &str, label: &str) -> Result<Vec3> {
-    let v = parse_floats(s, 3, label)?;
-    Ok(Vec3::new(v[0], v[1], v[2]))
-}
-
-fn build_camera(args: &Args) -> Result<Camera> {
+fn build_camera(args: &Args) -> Camera {
     let aspect = args.width as f32 / args.height as f32;
     let projection = Perspective::new(args.projection_fov.to_radians(), aspect, args.near, args.far);
     let up = Vec3::Y;
 
     // Priority: matrix > lookat > position > default.
-    if let Some(m) = &args.camera_matrix {
-        anyhow::ensure!(
-            args.camera_position.is_none() && args.camera_lookat.is_none(),
-            "--camera-matrix cannot be combined with --camera-position/--camera-lookat"
-        );
-        let vals = parse_floats(m, 16, "--camera-matrix")?;
-        let c2w = Mat4::from_cols_slice(&vals);
-        return Ok(Camera::from_camera_to_world(c2w, projection));
+    if let Some(Mat4Arg(c2w)) = args.camera_matrix {
+        return Camera::from_camera_to_world(c2w, projection);
     }
-    if let Some(target) = &args.camera_lookat {
-        let target = parse_vec3(target, "--camera-lookat")?;
-        let eye = match &args.camera_position {
-            Some(p) => parse_vec3(p, "--camera-position")?,
+    if let Some(Vec3Arg(target)) = args.camera_lookat {
+        let eye = match args.camera_position {
+            Some(Vec3Arg(p)) => p,
             None => Vec3::new(0.0, 0.0, 1.5),
         };
-        return Ok(Camera::look_at(eye, target, up, projection));
+        return Camera::look_at(eye, target, up, projection);
     }
-    if let Some(p) = &args.camera_position {
-        let eye = parse_vec3(p, "--camera-position")?;
-        return Ok(Camera::from_camera_to_world(Mat4::from_translation(eye), projection));
+    if let Some(Vec3Arg(eye)) = args.camera_position {
+        return Camera::from_camera_to_world(Mat4::from_translation(eye), projection);
     }
-    Ok(Camera::look_at(
-        Vec3::new(0.0, 0.0, 1.5),
-        Vec3::ZERO,
-        up,
-        projection,
-    ))
+    Camera::look_at(Vec3::new(0.0, 0.0, 1.5), Vec3::ZERO, up, projection)
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let bg = parse_floats(&args.background, 4, "--background")?;
-    let camera = build_camera(&args)?;
-    let model = match &args.model_position {
-        Some(p) => Mat4::from_translation(parse_vec3(p, "--model-position")?),
+    let camera = build_camera(&args);
+    let model = match args.model_position {
+        Some(Vec3Arg(p)) => Mat4::from_translation(p),
         None => Mat4::IDENTITY,
     };
 
@@ -143,7 +164,7 @@ fn main() -> Result<()> {
     let settings = RenderSettings {
         width: args.width,
         height: args.height,
-        background: [bg[0], bg[1], bg[2], bg[3]],
+        background: args.background.0,
         model,
         srgb_to_linear: args.srgb_to_linear,
         sort: args.sort.into(),

@@ -286,14 +286,17 @@ cargo reports 'block v0.1.6 contains code that will be rejected by a future vers
 ## 18: CLI vector/matrix flags are strings parsed after arg parsing
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: cli, effort:s
 created: 2026-09-02T18:59:14Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:43:43Z
+closed: 2026-09-02T19:43:43Z
 +++
 
 background, camera-position, camera-lookat, camera-matrix, and model-position are String args parsed manually in main/build_camera, so bad values produce runtime errors instead of clap usage errors at parse time.
+
+- `2026-09-02T19:43:43Z`: background/camera/model flags are now typed (Vec3Arg/Mat4Arg/RgbaArg with FromStr), so bad values fail at clap parse time with usage output; --camera-matrix conflicts declared via clap instead of a manual ensure.
 
 ---
