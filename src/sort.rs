@@ -185,7 +185,7 @@ pub(crate) fn gpu_sort(
         ],
     });
 
-    let groups = |n: u32| (n + 255) / 256;
+    let groups = |n: u32| n.div_ceil(256);
 
     let mut encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("sort-enc") });
@@ -220,22 +220,6 @@ fn padded_count(count: u32) -> Option<u32> {
     count.checked_next_power_of_two().map(|p| p.max(2))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn padded_count_rounds_up_and_rejects_overflow() {
-        assert_eq!(padded_count(0), Some(2));
-        assert_eq!(padded_count(1), Some(2));
-        assert_eq!(padded_count(3), Some(4));
-        assert_eq!(padded_count(1 << 31), Some(1 << 31));
-        // Anything above 2^31 has no u32 power-of-two ceiling.
-        assert_eq!(padded_count((1 << 31) + 1), None);
-        assert_eq!(padded_count(u32::MAX), None);
-    }
-}
-
 fn storage_bgl_entry(binding: u32, read_only: bool) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding,
@@ -259,5 +243,21 @@ fn uniform_bgl_entry(binding: u32, dynamic: bool) -> wgpu::BindGroupLayoutEntry 
             min_binding_size: None,
         },
         count: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn padded_count_rounds_up_and_rejects_overflow() {
+        assert_eq!(padded_count(0), Some(2));
+        assert_eq!(padded_count(1), Some(2));
+        assert_eq!(padded_count(3), Some(4));
+        assert_eq!(padded_count(1 << 31), Some(1 << 31));
+        // Anything above 2^31 has no u32 power-of-two ceiling.
+        assert_eq!(padded_count((1 << 31) + 1), None);
+        assert_eq!(padded_count(u32::MAX), None);
     }
 }

@@ -92,15 +92,18 @@ src/cloud.rs:8: clippy::excessive_precision fires on SH_C0 = 0.28209479177387814
 ## 6: Manual div_ceil in gpu_sort workgroup count (clippy warning)
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: lint, effort:xs
 created: 2026-09-02T18:59:04Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:44:56Z
+closed: 2026-09-02T19:44:56Z
 +++
 
 src/sort.rs:172: clippy::manual_div_ceil on '(n + 255) / 256'. render.rs already uses div_ceil for row padding, so the codebase is inconsistent.
+
+- `2026-09-02T19:44:56Z`: Workgroup count now uses div_ceil; also moved the sort tests module to end of file to clear the items_after_test_module lint introduced with #12. Clippy is clean.
 
 ---
 
