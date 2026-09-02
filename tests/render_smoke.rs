@@ -34,7 +34,8 @@ fn renders_reuse_and_sorts_agree() {
     let renderer = Renderer::new().expect("create renderer");
     let cloud = test_cloud();
     let settings = RenderSettings {
-        width: 64,
+        // Non-256-byte-aligned row width so readback row padding is exercised.
+        width: 63,
         height: 48,
         ..RenderSettings::default()
     };
@@ -50,8 +51,8 @@ fn renders_reuse_and_sorts_agree() {
     for sort in [SortMethod::Gpu, SortMethod::Cpu] {
         let settings = RenderSettings { sort, ..settings.clone() };
         let image = renderer.render(&cloud, &camera, &settings).expect("render");
-        assert_eq!(image.dimensions(), (64, 48));
-        let center = image.get_pixel(32, 24);
+        assert_eq!(image.dimensions(), (63, 48));
+        let center = image.get_pixel(31, 24);
         assert!(center.0[0] > 0, "center pixel should show the red splat ({sort:?})");
     }
 
