@@ -63,17 +63,19 @@ GpuSplat is 64 bytes of f32. The reference SparkSplat is a 32-byte half-precisio
 ## 4: Unported reference CLI flags: config JSON, statistics, label, camera-rotation, capture, reveal
 
 +++
-status: open
+status: closed
 priority: low
 kind: feature
 labels: cli, effort:l
 created: 2026-08-20T16:58:49Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T20:00:25Z
+closed: 2026-09-02T20:00:25Z
 +++
 
 splat-rs implements core render flags. Reference also has --config, --statistics/--stats, --label, --camera-rotation, --capture, --reveal, --renderer selection, point tuning.
 
 - `2026-09-02T19:48:48Z`: Reviewed while working the backlog: this bundles six flags with different value (config JSON / statistics / label vs. capture / reveal, which are macOS-app oriented and may not fit an offscreen CLI). Punting: needs a scope decision. Unblocker: say which flags you actually want ported and this can be split into per-flag issues.
+- `2026-09-02T20:00:25Z`: Decision: none of the remaining reference flags (config JSON, statistics, label, camera-rotation, capture, reveal) are wanted for the offscreen CLI. Closing as won't-do.
 
 ---
 
