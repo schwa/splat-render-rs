@@ -57,7 +57,10 @@ fn goldens_match_reference() {
             continue;
         }
         let golden_path = case.golden;
-        assert!(Path::new(golden_path).exists(), "missing golden {golden_path}");
+        assert!(
+            Path::new(golden_path).exists(),
+            "missing golden {golden_path}"
+        );
 
         for sort in ["cpu", "gpu"] {
             let out = std::env::temp_dir().join(format!(
@@ -88,7 +91,11 @@ fn goldens_match_reference() {
             let golden = image::open(golden_path).expect("open golden").to_rgba8();
             let err = rmse(&mine, &golden);
             eprintln!("{} ({sort}): RMSE {err:.5}", case.ply);
-            assert!(err < 0.02, "{} ({sort}) diverged from golden: RMSE {err}", case.ply);
+            assert!(
+                err < 0.02,
+                "{} ({sort}) diverged from golden: RMSE {err}",
+                case.ply
+            );
             ran += 1;
         }
     }

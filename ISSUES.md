@@ -25,17 +25,19 @@ The --sort gpu path prints a note and uses the CPU back-to-front sort instead. T
 ## 2: Only PLY input is supported; reference also reads .splat/.spz/.sog
 
 +++
-status: open
+status: closed
 priority: low
 kind: feature
 labels: io, effort:l
 created: 2026-08-20T16:58:49Z
-updated: 2026-09-02T19:34:42Z
+updated: 2026-09-02T19:55:12Z
+closed: 2026-09-02T19:55:12Z
 +++
 
 load_ply handles PLY (ascii + binary_little_endian) only. The reference SplatLoader reads .splat, .spz, and .sog (the latter GPU-decoded). Add these formats.
 
 - `2026-09-02T19:44:08Z`: Reviewed: .splat is trivial, but .spz/.sog need format references and there are no sample files of any of the three here to validate a reader against. Punting rather than shipping untested parsers. Unblocker: provide sample .splat/.spz/.sog files (or confirm .splat-only is acceptable as a first step).
+- `2026-09-02T19:55:12Z`: Added readers for all three formats, ported from the Swift Splats package: .splat (32-byte Antimatter15 records), .spz (v2/v3 gzip + v4 zstd-stream containers, packed 24-bit positions, smallest-three v3 rotations), .sog (zip + WebP attribute images, codebooks, SH palette). SplatCloud::from_path dispatches by extension; CLI accepts all formats. Tested against SplatSamples fixtures (skip-if-missing) plus a self-contained .splat unit test; lion.v3.spz and RainbowRing.sog render correctly.
 
 ---
 

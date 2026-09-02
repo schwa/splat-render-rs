@@ -49,19 +49,39 @@ fn renders_reuse_and_sorts_agree() {
 
     // Render twice with the same renderer (pipelines are cached), both sort paths.
     for sort in [SortMethod::Gpu, SortMethod::Cpu] {
-        let settings = RenderSettings { sort, ..settings.clone() };
+        let settings = RenderSettings {
+            sort,
+            ..settings.clone()
+        };
         let image = renderer.render(&cloud, &camera, &settings).expect("render");
         assert_eq!(image.dimensions(), (63, 48));
         let center = image.get_pixel(31, 24);
-        assert!(center.0[0] > 0, "center pixel should show the red splat ({sort:?})");
+        assert!(
+            center.0[0] > 0,
+            "center pixel should show the red splat ({sort:?})"
+        );
     }
 
     // CPU and GPU sorts must produce identical images for this scene.
     let cpu = renderer
-        .render(&cloud, &camera, &RenderSettings { sort: SortMethod::Cpu, ..settings.clone() })
+        .render(
+            &cloud,
+            &camera,
+            &RenderSettings {
+                sort: SortMethod::Cpu,
+                ..settings.clone()
+            },
+        )
         .expect("cpu render");
     let gpu = renderer
-        .render(&cloud, &camera, &RenderSettings { sort: SortMethod::Gpu, ..settings })
+        .render(
+            &cloud,
+            &camera,
+            &RenderSettings {
+                sort: SortMethod::Gpu,
+                ..settings
+            },
+        )
         .expect("gpu render");
     assert_eq!(cpu.as_raw(), gpu.as_raw(), "cpu vs gpu sort images differ");
 }

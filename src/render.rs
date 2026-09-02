@@ -216,9 +216,14 @@ impl Renderer {
                     usage: wgpu::BufferUsages::STORAGE,
                 })
             }
-            SortMethod::Gpu => {
-                sort::gpu_sort(device, queue, &self.sort_pipelines, &splat_buf, count, camera.view * settings.model)?
-            }
+            SortMethod::Gpu => sort::gpu_sort(
+                device,
+                queue,
+                &self.sort_pipelines,
+                &splat_buf,
+                count,
+                camera.view * settings.model,
+            )?,
         };
 
         let uniforms = Uniforms {
@@ -276,7 +281,6 @@ impl Renderer {
                 },
             ],
         });
-
 
         // Readback buffer with 256-byte row alignment.
         let bytes_per_pixel = 4u32;
@@ -361,8 +365,7 @@ impl Renderer {
             let start = y * padded as usize;
             out_row.copy_from_slice(&data[start..start + unpadded as usize]);
         }
-        let img = RgbaImage::from_raw(width, height, pixels)
-            .context("readback size mismatch")?;
+        let img = RgbaImage::from_raw(width, height, pixels).context("readback size mismatch")?;
         drop(data);
         readback.unmap();
 

@@ -72,9 +72,12 @@ impl FromStr for RgbaArg {
 
 /// Render a 3D Gaussian Splat file to a PNG.
 #[derive(Parser, Debug)]
-#[command(name = "splat-render-rs", about = "Render Gaussian splat files to PNG images")]
+#[command(
+    name = "splat-render-rs",
+    about = "Render Gaussian splat files to PNG images"
+)]
 struct Args {
-    /// Path to the splat file (.ply) to render.
+    /// Path to the splat file (.ply, .splat, .spz, .sog) to render.
     splat: String,
 
     /// Output PNG file path.
@@ -128,7 +131,12 @@ struct Args {
 
 fn build_camera(args: &Args) -> Camera {
     let aspect = args.width as f32 / args.height as f32;
-    let projection = Perspective::new(args.projection_fov.to_radians(), aspect, args.near, args.far);
+    let projection = Perspective::new(
+        args.projection_fov.to_radians(),
+        aspect,
+        args.near,
+        args.far,
+    );
     let up = Vec3::Y;
 
     // Priority: matrix > lookat > position > default.
@@ -157,9 +165,13 @@ fn main() -> Result<()> {
         None => Mat4::IDENTITY,
     };
 
-    let cloud = SplatCloud::from_ply_path(&args.splat)
-        .with_context(|| format!("loading {}", args.splat))?;
-    eprintln!("Loaded {} splats, SH degree {}", cloud.splats().len(), cloud.sh_degree());
+    let cloud =
+        SplatCloud::from_path(&args.splat).with_context(|| format!("loading {}", args.splat))?;
+    eprintln!(
+        "Loaded {} splats, SH degree {}",
+        cloud.splats().len(),
+        cloud.sh_degree()
+    );
 
     let settings = RenderSettings {
         width: args.width,
@@ -172,7 +184,9 @@ fn main() -> Result<()> {
 
     let renderer = Renderer::new()?;
     let image = renderer.render(&cloud, &camera, &settings)?;
-    image.save(&args.output).with_context(|| format!("writing {}", args.output))?;
+    image
+        .save(&args.output)
+        .with_context(|| format!("writing {}", args.output))?;
     eprintln!("Wrote {}", args.output);
     Ok(())
 }

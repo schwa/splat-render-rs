@@ -80,6 +80,10 @@ fn prop_f32(el: &DefaultElement, key: &str) -> Option<f32> {
     }
 }
 
+fn read_file(path: &std::path::Path) -> Result<Vec<u8>> {
+    std::fs::read(path).with_context(|| format!("open {}", path.display()))
+}
+
 fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x).exp())
 }
@@ -146,6 +150,54 @@ impl SplatCloud {
         })
     }
 
+    /// Load a splat cloud from a file, choosing the format by extension:
+    /// `.ply`, `.splat` (Antimatter15), `.spz`, or `.sog`. Unknown extensions
+    /// are tried as PLY.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the file cannot be opened or is not valid for its format.
+    pub fn from_path(path: impl AsRef<std::path::Path>) -> Result<SplatCloud> {
+        let path = path.as_ref();
+        let extension = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(str::to_ascii_lowercase);
+        match extension.as_deref() {
+            Some("splat") => Self::from_splat_bytes(&read_file(path)?),
+            Some("spz") => Self::from_spz_bytes(&read_file(path)?),
+            Some("sog") => Self::from_sog_bytes(&read_file(path)?),
+            _ => Self::from_ply_path(path),
+        }
+    }
+
+    /// Load a cloud from Antimatter15 `.splat` bytes.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the data is not a whole number of 32-byte records.
+    pub fn from_splat_bytes(bytes: &[u8]) -> Result<SplatCloud> {
+        crate::antimatter15::from_splat_bytes(bytes)
+    }
+
+    /// Load a cloud from SPZ bytes (v2/v3 gzip container or v4 zstd streams).
+    ///
+    /// # Errors
+    ///
+    /// Fails on malformed containers, unsupported versions, or SH degree 4.
+    pub fn from_spz_bytes(bytes: &[u8]) -> Result<SplatCloud> {
+        crate::spz::from_spz_bytes(bytes)
+    }
+
+    /// Load a cloud from SOG archive bytes.
+    ///
+    /// # Errors
+    ///
+    /// Fails on invalid archives, metadata, images, or codebook indices.
+    pub fn from_sog_bytes(bytes: &[u8]) -> Result<SplatCloud> {
+        crate::sog::from_sog_bytes(bytes)
+    }
+
     /// Load a Gaussian splat cloud from a `.ply` file.
     ///
     /// # Errors
@@ -153,8 +205,7 @@ impl SplatCloud {
     /// Fails when the file cannot be opened or is not parseable PLY.
     pub fn from_ply_path(path: impl AsRef<std::path::Path>) -> Result<SplatCloud> {
         let path = path.as_ref();
-        let file = File::open(path)
-            .with_context(|| format!("open {}", path.display()))?;
+        let file = File::open(path).with_context(|| format!("open {}", path.display()))?;
         Self::from_ply_reader(BufReader::new(file))
     }
 
@@ -180,7 +231,6 @@ impl SplatCloud {
 }
 
 fn cloud_from_ply(ply: ply_rs::ply::Ply<DefaultElement>) -> SplatCloud {
-
     // The vertex element holds the splats; pick the largest element as a fallback.
     let empty: Vec<DefaultElement> = Vec::new();
     let verts = ply
@@ -205,14 +255,22 @@ fn cloud_from_ply(ply: ply_rs::ply::Ply<DefaultElement>) -> SplatCloud {
         let z = prop_f32(v, "z").unwrap_or(0.0);
 
         // Scale activation: exp.
-        let sx = prop_f32(v, "scale_0").or_else(|| prop_f32(v, "sx")).unwrap_or(0.0);
-        let sy = prop_f32(v, "scale_1").or_else(|| prop_f32(v, "sy")).unwrap_or(0.0);
-        let sz = prop_f32(v, "scale_2").or_else(|| prop_f32(v, "sz")).unwrap_or(0.0);
+        let sx = prop_f32(v, "scale_0")
+            .or_else(|| prop_f32(v, "sx"))
+            .unwrap_or(0.0);
+        let sy = prop_f32(v, "scale_1")
+            .or_else(|| prop_f32(v, "sy"))
+            .unwrap_or(0.0);
+        let sz = prop_f32(v, "scale_2")
+            .or_else(|| prop_f32(v, "sz"))
+            .unwrap_or(0.0);
 
         // Color: f_dc_* through SH_C0, or raw red/green/blue (0..255).
-        let (cr, cg, cb) = if let (Some(a), Some(b), Some(c)) =
-            (prop_f32(v, "f_dc_0"), prop_f32(v, "f_dc_1"), prop_f32(v, "f_dc_2"))
-        {
+        let (cr, cg, cb) = if let (Some(a), Some(b), Some(c)) = (
+            prop_f32(v, "f_dc_0"),
+            prop_f32(v, "f_dc_1"),
+            prop_f32(v, "f_dc_2"),
+        ) {
             (
                 (a * SH_C0 + 0.5).clamp(0.0, 1.0),
                 (b * SH_C0 + 0.5).clamp(0.0, 1.0),
@@ -364,12 +422,15 @@ mod tests {
 
     #[test]
     fn with_sh_validates_length() {
-        let splats = vec![GpuSplat::new(
-            glam::Vec3::ZERO,
-            glam::Vec3::ONE,
-            glam::Quat::IDENTITY,
-            glam::Vec4::ONE,
-        ); 2];
+        let splats = vec![
+            GpuSplat::new(
+                glam::Vec3::ZERO,
+                glam::Vec3::ONE,
+                glam::Quat::IDENTITY,
+                glam::Vec4::ONE,
+            );
+            2
+        ];
         // degree 1 => 9 floats per splat => 18 total.
         assert!(SplatCloud::with_sh(splats.clone(), 1, vec![0.0; 18]).is_ok());
         assert!(SplatCloud::with_sh(splats.clone(), 1, vec![0.0; 17]).is_err());

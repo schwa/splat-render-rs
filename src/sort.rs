@@ -170,9 +170,18 @@ pub(crate) fn gpu_sort(
         label: Some("sort-bg"),
         layout: &pipelines.layout,
         entries: &[
-            wgpu::BindGroupEntry { binding: 0, resource: splat_buf.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 1, resource: records.as_entire_binding() },
-            wgpu::BindGroupEntry { binding: 2, resource: build_buf.as_entire_binding() },
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: splat_buf.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: records.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: build_buf.as_entire_binding(),
+            },
             wgpu::BindGroupEntry {
                 binding: 3,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
@@ -181,14 +190,18 @@ pub(crate) fn gpu_sort(
                     size: wgpu::BufferSize::new(std::mem::size_of::<StepParams>() as u64),
                 }),
             },
-            wgpu::BindGroupEntry { binding: 4, resource: index_buf.as_entire_binding() },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: index_buf.as_entire_binding(),
+            },
         ],
     });
 
     let groups = |n: u32| n.div_ceil(256);
 
-    let mut encoder =
-        device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("sort-enc") });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("sort-enc"),
+    });
     {
         let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("sort-pass"),

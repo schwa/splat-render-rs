@@ -21,10 +21,13 @@
 //! # Ok::<(), anyhow::Error>(())
 //! ```
 
+mod antimatter15;
 mod camera;
 mod cloud;
 mod render;
+mod sog;
 mod sort;
+mod spz;
 
 pub use camera::{Camera, Perspective};
 pub use cloud::{floats_per_splat, GpuSplat, SplatCloud};
