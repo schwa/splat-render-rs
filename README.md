@@ -29,6 +29,34 @@ Renders a `.ply` Gaussian splat file to `output.png`.
 | `--near <f>` / `--far <f>` | `0.1` / `100` | Clip planes |
 | `--srgb-to-linear` | off | Convert sRGB→linear in the fragment shader |
 | `--sort cpu\|gpu` | `gpu` | Depth sort: GPU bitonic or CPU fallback |
+| `--poses <path>` | — | Batch mode: JSON array of poses; renders all with one load |
+| `--output-dir <dir>` | `.` | Batch mode: directory for output PNGs |
+| `--stats <path>` | — | Batch mode: per-pose alpha stats as JSON lines |
+
+### Batch mode
+
+Render many cameras from one cloud load:
+
+```sh
+splat-render-rs scene.ply --poses poses.json --output-dir out \
+    --stats stats.jsonl --background 0,0,0,0
+```
+
+`poses.json` is an array of poses. Each pose has either `matrix` (16
+column-major camera-to-world values) or `position` + optional `lookat`
+(default origin), `up` (default +Y), and `fov` in degrees (default
+`--projection-fov`). `name` sets the output file stem (default: index).
+
+```json
+[
+  {"name": "front", "position": [0, 0, 4], "lookat": [0, 0, 0]},
+  {"position": [0, 10, 0], "up": [0, 0, 1], "fov": 45}
+]
+```
+
+With `--stats`, each rendered pose appends a JSON line with `coverage`
+(fraction of pixels with alpha > 0.5) and `mean_alpha`. Use
+`--background 0,0,0,0` so alpha reflects accumulated splat opacity.
 
 Example:
 
